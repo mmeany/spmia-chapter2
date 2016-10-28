@@ -1,17 +1,70 @@
 
 # What did I change:
+Below is a list of the changes I have made:
 
 * src/main/docker/DockerFile
-** Switched to a fixed version of Alpine Linux
-** Changed the update semantics to match above
-** Replaced the hard-coded JAR filename with a token that Maven will replace
-** Not sure why netcat is baked into the image, but there are a lot of chapters still to come so I left it there and updated package name to the one used by Alpine Linux.
+ * Switched to a fixed version of Alpine Linux
+ * Changed the update semantics to match above
+ * Replaced the hard-coded JAR filename with a token that Maven will replace
+ * Not sure why netcat is baked into the image, but there are a lot of chapters still to come so I left it there and updated package name to the one used by Alpine Linux.
+
+ ```Dockerfile
+FROM openjdk:8-jdk-alpine
+RUN apk update && apk upgrade && apk add netcat-openbsd
+ ```
+
 * src/main/docker/run.sh
-** Replaced the hard-coded JAR filename with a token that Maven will replace
+ * Replaced the hard-coded JAR filename with a token that Maven will replace
+
+ ```bash
+java -jar /usr/local/licensingservice/@project.build.finalName@.jar
+ ```
+
 * pom.xml
-** Added maven-resources-plugin that copies DockerFile and run.sh into target directory at build time and replaces tokens (JAR filename)
-** Modified the docker-maven-plugin entry to use a later version
-** Modified the docker-maven-plugin to locate the filtered DockerFile and run.sh file from target folder
+ * Added maven-resources-plugin that copies DockerFile and run.sh into target directory at build time and replaces tokens (JAR filename)
+ * Modified the docker-maven-plugin entry to use a later version
+ * Modified the docker-maven-plugin to locate the filtered DockerFile and run.sh file from target folder
+
+ ```xml
+            <plugin>
+                <artifactId>maven-resources-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>copy-resources</id>
+                        <!-- here the phase you need -->
+                        <phase>validate</phase>
+                        <goals>
+                            <goal>copy-resources</goal>
+                        </goals>
+                        <configuration>
+                            <outputDirectory>${basedir}/target/dockerfile</outputDirectory>
+                            <resources>
+                                <resource>
+                                    <directory>src/main/docker</directory>
+                                    <filtering>true</filtering>
+                                </resource>
+                            </resources>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>com.spotify</groupId>
+                <artifactId>docker-maven-plugin</artifactId>
+                <version>0.4.10</version>
+                <configuration>
+                    <imageName>${docker.image.name}:${docker.image.tag}</imageName>
+                    <dockerDirectory>${basedir}/target/dockerfile</dockerDirectory>
+                    <resources>
+                        <resource>
+                            <targetPath>/</targetPath>
+                            <directory>${project.build.directory}</directory>
+                            <include>${project.build.finalName}.jar</include>
+                        </resource>
+                    </resources>
+                </configuration>
+            </plugin>
+ ```
 
 # Why did I change it
 Details are explained below, however what drove me to this is bad experiences in a production environment attributed to a lack of rigour. The issues encountered could happen on any project, but are easily avoidable and avoidance technique should be explained from the outset. 
